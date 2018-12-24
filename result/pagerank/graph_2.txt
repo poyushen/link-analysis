@@ -1,0 +1,5 @@
+
+Graph 2
+Run 0 iterations
+pagerank:
+{1: 0.2, 2: 0.2, 3: 0.2, 4: 0.2, 5: 0.2}

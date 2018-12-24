@@ -1,91 +1,61 @@
-#!/usr/bin/env python3
+from graph import graph
 import numpy as np
+import time
+from pprint import PrettyPrinter
 
-tup = []
-queries = []
-ads = []
-with open('./data/graph_4.txt') as f:
-    for line in f:
-        l = [int(i) for i in line.split(',')]
-        tup.append(tuple(l))
-        queries.append(l[0])
-        ads.append(l[1])
+def simrank(graph, min_diff=0.01, decay_factor=0.8):
+    nodes = graph.nodes()
+    sim = np.identity(len(nodes))
+    iteration = 0
 
-graph = np.matrix(np.zeros([len(queries), len(ads)]))
+    while True:
+        iteration += 1
+        prev_sim = np.copy(sim)
 
-for l in tup:
-    query = l[0]
-    ad = l[1]
-    q_i = queries.index(query)
-    a_j = ads.index(ad)
-    graph[q_i, a_j] += 1
+        for idx_u, u in enumerate(nodes):
+            for idx_v, v in enumerate(nodes):
+                if u is v:
+                    continue
 
-query_sim = np.matrix(np.identity(len(queries)))
-ad_sim = np.matrix(np.identity(len(ads)))
+                len_up = len(graph.parents(u))
+                len_vp = len(graph.parents(v))
+                if len_up == 0 or len_vp == 0:
+                    sim[idx_u][idx_v] = 0
+                else:
+                    sum = 0
+                    for u_p in graph.parents(u):
+                        for v_p in graph.parents(v):
+                            sum += prev_sim[nodes.index(u_p)][nodes.index(v_p)]
+                    sim[idx_u][idx_v] = (decay_factor / (len_up * len_vp)) * sum
 
-def get_ads_num(query):
-    q_i = queries.index(query)
-    return graph[q_i]
+        if np.allclose(sim, prev_sim, atol=min_diff):
+            break
 
-def get_queries_num(ad):
-    a_j = ads.index(ad)
-    return graph.transpose()[a_j]
+    return sim, iteration
 
-def get_ads(query):
-    series = get_ads_num(query).tolist()[0]
-    return [ ads[x] for x in range(len(series)) if series[x] > 0 ]
+if __name__ == '__main__':
 
-def get_queries(ad):
-    series = get_queries_num(ad).tolist()[0]
-    return [ queries[x] for x in range(len(series)) if series[x] > 0 ]
+    graphs = list()
+    for i in range(1, 7):
+        from graph import graph
+        filename = 'data/graph_{}.txt'.format(i)
+        graph = graph()
+        graph.read_from_file(filename)
+        graphs.append(graph)
 
 
-def query_simrank(q1, q2, C):
-    if q1 == q2 : return 1
-    prefix = C / (get_ads_num(q1).sum() * get_ads_num(q2).sum())
-    postfix = 0
-    for ad_i in get_ads(q1):
-        for ad_j in get_ads(q2):
-            i = ads.index(ad_i)
-            j = ads.index(ad_j)
-            postfix += ad_sim[i, j]
-    return prefix * postfix
+    for idx, graph in enumerate(graphs, 1):
+        time1 = time.time()
+        if idx == 6:
+            break
 
-def ad_simrank(a1, a2, C):
-    if a1 == a2 : return 1
-    prefix = C / (get_queries_num(a1).sum() * get_queries_num(a2).sum())
-    postfix = 0
-    for query_i in get_queries(a1):
-        for query_j in get_queries(a2):
-            i = queries.index(query_i)
-            j = queries.index(query_j)
-            postfix += query_sim[i,j]
-    return prefix * postfix
-
-def simrank(C=0.8, times=1):
-    global query_sim, ad_sim
-
-    for run in range(times):
-        # queries simrank
-        new_query_sim = np.matrix(np.identity(len(queries)))
-        for qi in queries:
-            for qj in queries:
-                i = queries.index(qi)
-                j = queries.index(qj)
-                new_query_sim[i,j] = query_simrank(qi, qj, C)
-
-        # ads simrank
-        new_ad_sim = np.matrix(np.identity(len(ads)))
-        for ai in ads:
-            for aj in ads:
-                i = ads.index(ai)
-                j = ads.index(aj)
-                new_ad_sim[i,j] = ad_simrank(ai, aj, C)
-
-        query_sim = new_query_sim
-        ad_sim = new_ad_sim
-    print(query_sim)
-    print(ad_sim)
-
-simrank()
-
+        filename = 'graph_{}.txt'.format(idx)
+        with open(filename, 'w') as f:
+            pp = PrettyPrinter(indent=4, stream=f)
+            f.write('\nGraph {}\n'.format(idx))
+            s, i = simrank(graph)
+            f.write('Run {} iterations \nSimRank:\n'.format(i))
+            pp.pprint(s)
+        time2 = time.time()
+        print("graph_%d: "%idx, time2-time1)
+    print('end')

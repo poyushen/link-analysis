@@ -5,7 +5,7 @@ from math import sqrt
 
 class HITS():
     def __init__(self, file=None, max_iter=100, tol=1e-6, **kwargs):
-        self.graph = load(file)
+        self.graph, self.items = load(file)
         self.max_iter = max_iter
         self.tol = tol
         self.n = len(self.graph)
@@ -27,13 +27,17 @@ class HITS():
             self.hubs = [x / hubs_scale for x in self.hubs]
 
             if abs(sum(self.hubs) - prevhubs) < self.n * self.tol or abs(sum(self.auth) - prevauth) < self.n*self.tol:
+                end = i
                 break
 
-        return self.hubs, self.auth
+        hubs = {self.items[i]:self.hubs[i] for i in range(self.n)}
+        auth = {self.items[i]:self.auth[i] for i in range(self.n)}
+
+        return hubs, auth, end
 
 class PageRank():
     def __init__(self, file=None, alpha=0.85, max_iter=100, tol=1e-6, **kwargs):
-        self.graph = load(file)
+        self.graph, self.items = load(file)
         self.max_iter = max_iter
         self.tol = tol
         self.n = len(self.graph)
@@ -54,8 +58,11 @@ class PageRank():
                 self.pagerank[j] = (1-self.alpha)/self.n + self.alpha*self.pagerank[j]
 
             if abs(sum(self.pagerank) - prevpagerank) < self.n * self.tol:
+                end = i
                 break
-        return self.pagerank
+
+        pagerank = {self.items[i]:self.pagerank[i] for i in range(self.n)}
+        return pagerank, end
 
 def load(path):
     A = []
@@ -83,20 +90,28 @@ def load(path):
         except:
             A[i] = A[i]
 
-    return A
+    return A, items
 
 if '__main__' == __name__:
     np.set_printoptions(suppress=True)
-    for i in range(1, 7):
+    for i in range(1, 9):
         h = HITS(file='data/graph_%d.txt' %i)
         p = PageRank(file='data/graph_%d.txt' %i)
         time1 = time.time()
-        hubs, auth = h.hits()
+        hubs, auth, end_h = h.hits()
         time2 = time.time()
-        pagerank = p.pr()
+        pagerank, end_p = p.pr()
         time3 = time.time()
+        with open('result/hits/graph_%d.txt' %i, 'w') as f:
+            f.write('\nGraph %d\n' %i)
+            f.write('Run %d iterations\n' %end_h)
+            f.write('hubs:\n')
+            f.write(str(hubs))
+            f.write('\nauth:\n')
+            f.write(str(auth))
 
-        print("graph_%d time for     HITS: " %i, time2 - time1)
-        print("graph_%d time for PageRank: " %i, time3 - time2)
-        print("\n")
-
+        with open('result/pagerank/graph_%d.txt' %i, 'w') as f:
+            f.write('\nGraph %d\n' %i)
+            f.write('Run %d iterations\n' %end_p)
+            f.write('pagerank:\n')
+            f.write(str(pagerank))
